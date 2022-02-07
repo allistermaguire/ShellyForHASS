@@ -11,9 +11,9 @@ from homeassistant.const import (
 )
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS, ATTR_COLOR_TEMP, ATTR_EFFECT, ATTR_HS_COLOR, 
-    ATTR_WHITE_VALUE,
+    ATTR_WHITE_VALUE, ATTR_TRANSITION,
     SUPPORT_BRIGHTNESS, SUPPORT_COLOR, SUPPORT_COLOR_TEMP, SUPPORT_EFFECT,
-    SUPPORT_WHITE_VALUE,
+    SUPPORT_TRANSITION, SUPPORT_WHITE_VALUE,
 )
 from functools import partial
 from homeassistant.helpers import config_validation as cv, entity_platform, service
@@ -119,7 +119,7 @@ class ShellyDimmer(ShellyDevice, LightEntity):
         self._master_unit = True
         self.update()
 
-        self._features = SUPPORT_BRIGHTNESS
+        self._features = SUPPORT_BRIGHTNESS | SUPPORT_TRANSITION
         if getattr(dev, "support_color_temp", False):
             self._color_temp_min = dev._color_temp_min
             self._color_temp_max = dev._color_temp_max
@@ -137,6 +137,7 @@ class ShellyDimmer(ShellyDevice, LightEntity):
     def turn_on(self, **kwargs):
         brightness = None
         color_temp = None
+        transition = None
         if ATTR_BRIGHTNESS in kwargs:
             brightness = round(kwargs[ATTR_BRIGHTNESS] / 2.55)
             self._brightness = brightness
@@ -147,10 +148,12 @@ class ShellyDimmer(ShellyDevice, LightEntity):
             if color_temp < self._color_temp_min:
                 color_temp = self._color_temp_min
             self._color_temp = color_temp
+        if ATTR_TRANSITION in kwargs:
+            transition = kwargs[ATTR_TRANSITION]
         if color_temp:
-            self._dev.turn_on(brightness, color_temp)
+            self._dev.turn_on(brightness, transition, color_temp)
         else:
-            self._dev.turn_on(brightness)
+            self._dev.turn_on(brightness, transition)
         self._state = True
         self._update_ha_state()
 
@@ -173,8 +176,11 @@ class ShellyDimmer(ShellyDevice, LightEntity):
     async def async_set_value(self, **kwargs):
         await self.hass.async_add_executor_job(partial(self.set_value, **kwargs))
 
-    def turn_off(self, **_kwargs):
-        self._dev.turn_off()
+    def turn_off(self, **kwargs):
+        transition = None
+        if ATTR_TRANSITION in kwargs:
+            transition = kwargs[ATTR_TRANSITION]
+        self._dev.turn_off(transition)
         self._state = False
         self._update_ha_state()
 
